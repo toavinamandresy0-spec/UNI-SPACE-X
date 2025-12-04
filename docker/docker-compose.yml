@@ -1,0 +1,139 @@
+version: '3.8'
+
+services:
+  # Base de données MySQL
+  database:
+    image: mysql:8.0
+    container_name: spatial_research_db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root_password_2024}
+      MYSQL_DATABASE: spatial_research
+      MYSQL_USER: ${DB_USER:-spatial_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-spatial_password_2024}
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./mysql/my.cnf:/etc/mysql/conf.d/custom.cnf:ro
+      - ../backend/data/sql:/docker-entrypoint-initdb.d:ro
+    networks:
+      - spatial_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  # Backend PHP
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    container_name: spatial_research_backend
+    environment:
+      DB_HOST: database
+      DB_PORT: 3306
+      DB_NAME: spatial_research
+      DB_USER: ${DB_USER:-spatial_user}
+      DB_PASSWORD: ${DB_PASSWORD:-spatial_password_2024}
+      APP_ENV: ${APP_ENV:-development}
+    ports:
+      - "8000:80"
+    volumes:
+      - ../backend:/var/www/html
+      - ./php/php.ini:/usr/local/etc/php/conf.d/custom.ini:ro
+    depends_on:
+      database:
+        condition: service_healthy
+    networks:
+      - spatial_network
+
+  # Frontend Nginx
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+    container_name: spatial_research_frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../frontend:/usr/share/nginx/html:ro
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - backend
+    networks:
+      - spatial_network
+
+  # Redis pour le cache et les sessions
+  redis:
+    image: redis:7-alpine
+    container_name: spatial_research_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./redis/redis.conf:/etc/redis/redis.conf:ro
+    command: redis-server /etc/redis/redis.conf
+    networks:
+      - spatial_network
+
+  # Adminer pour la gestion de la base de données
+  adminer:
+    image: adminer
+    container_name: spatial_research_adminer
+    ports:
+      - "8080:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: database
+    depends_on:
+      - database
+    networks:
+      - spatial_network
+
+  # Monitoring avec Prometheus et Grafana
+  prometheus:
+    image: prom/prometheus
+    container_name: spatial_research_prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+    networks:
+      - spatial_network
+
+  grafana:
+    image: grafana/grafana
+    container_name: spatial_research_grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/datasources:/etc/grafana/provisioning/datasources:ro
+    depends_on:
+      - prometheus
+    networks:
+      - spatial_network
+
+volumes:
+  db_data:
+    driver: local
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  spatial_network:
+    driver: bridge

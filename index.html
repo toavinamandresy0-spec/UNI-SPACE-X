@@ -1,0 +1,1458 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laboratoire Scientifique Spatial - Plateforme de Recherche Avancée</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+    
+    <style>
+        :root {
+            --primary: #1a237e; --secondary: #283593; --accent: #3949ab;
+            --success: #00c853; --warning: #ffab00; --danger: #ff1744;
+            --research: #7b1fa2; --quantum: #00bcd4; --dark: #0d1b2a;
+            --light: #e8eaf6; --text: #ffffff; --sidebar-width: 320px;
+            --header-height: 70px; --footer-height: 200px;
+            --panel-bg: rgba(13, 27, 42, 0.85); --panel-border: rgba(255, 255, 255, 0.1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+
+        body {
+            background: linear-gradient(135deg, var(--dark) 0%, #1b263b 100%);
+            color: var(--text); overflow-x: hidden; min-height: 100vh;
+        }
+
+        /* Mode grand écran */
+        body.fullscreen-mode { padding: 0; }
+        body.fullscreen-mode .container {
+            grid-template-columns: 1fr; grid-template-rows: var(--header-height) 1fr;
+            grid-template-areas: "header" "main"; gap: 0;
+        }
+        body.fullscreen-mode .sidebar, body.fullscreen-mode footer { display: none; }
+        body.fullscreen-mode main { padding: 1rem; height: calc(100vh - var(--header-height)); }
+        body.fullscreen-mode .dashboard-grid { grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem; }
+        body.fullscreen-mode .card { min-height: 300px; }
+        body.fullscreen-mode .visualization-3d { height: 500px; }
+
+        .container {
+            display: grid; grid-template-columns: var(--sidebar-width) 1fr var(--sidebar-width);
+            grid-template-rows: var(--header-height) 1fr var(--footer-height);
+            grid-template-areas: "header header header" "left-sidebar main right-sidebar" "footer footer footer";
+            min-height: 100vh; gap: 0; transition: all 0.3s ease;
+        }
+
+        header {
+            grid-area: header; background: rgba(13, 27, 42, 0.95); backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--panel-border); display: flex; justify-content: space-between;
+            align-items: center; padding: 0 1rem; position: sticky; top: 0; z-index: 1000;
+        }
+
+        /* Professional navbar layout */
+        .header-controls {
+            display: flex; align-items: center; gap: 1rem; width: 100%; max-width: 1600px; margin: 0 auto;
+            padding: 0 1rem; box-sizing: border-box;
+        }
+        .header-left, .header-center, .header-right { display: flex; align-items: center; gap: 0.6rem; }
+        .header-left { flex: 0 0 auto; }
+        .header-center { flex: 1 1 auto; justify-content: center; }
+        .header-right { flex: 0 0 auto; }
+
+        .nav-group { display:flex; gap:0.5rem; align-items:center; }
+        .mission-select { min-width: 200px; }
+        .timeline-step { padding: .25rem .6rem; border-radius:6px; opacity:0.8; cursor: pointer }
+        .timeline-step:hover { opacity: 1; }
+
+        @media (max-width: 900px) {
+            .header-controls { padding: 0 .6rem; }
+            .mission-select { display: none; }
+            .header-center { display: none; }
+            .btn { padding: .5rem .75rem; font-size: .9rem }
+        }
+
+        .logo { display: flex; align-items: center; gap: 1rem; }
+        .logo i { font-size: 2rem; color: var(--quantum); }
+        .logo h1 {
+            font-size: 1.5rem; font-weight: 700;
+            background: linear-gradient(90deg, var(--quantum), var(--research));
+            -webkit-background-clip: text; background-clip: text; color: transparent;
+        }
+
+        .header-controls { display: flex; gap: 1rem; }
+        .btn {
+            padding: 0.7rem 1.5rem; border-radius: 8px; border: none; font-weight: 600;
+            cursor: pointer; transition: all 0.3s ease; display: flex; align-items: center; gap: 0.5rem;
+        }
+        .btn-primary { background: var(--accent); color: white; }
+        .btn-research { background: var(--research); color: white; }
+        .btn-quantum { background: var(--quantum); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-outline { background: transparent; color: var(--light); border: 1px solid rgba(255, 255, 255, 0.2); }
+
+        .btn-primary:hover { background: #303f9f; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(57, 73, 171, 0.4); }
+        .btn-research:hover { background: #6a1b9a; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(123, 31, 162, 0.4); }
+        .btn-quantum:hover { background: #0097a7; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0, 188, 212, 0.4); }
+        .btn-danger:hover { background: #d50000; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(255, 23, 68, 0.4); }
+        .btn-outline:hover { background: rgba(255, 255, 255, 0.1); }
+
+        .sidebar {
+            background: var(--panel-bg); backdrop-filter: blur(10px); border-right: 1px solid var(--panel-border);
+            padding: 1.5rem; overflow-y: auto; height: calc(100vh - var(--header-height) - var(--footer-height));
+        }
+        .left-sidebar { grid-area: left-sidebar; }
+        .right-sidebar { grid-area: right-sidebar; border-right: none; border-left: 1px solid var(--panel-border); }
+
+        .sidebar-title {
+            font-size: 1.2rem; margin-bottom: 1.5rem; padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--panel-border); display: flex; align-items: center; gap: 0.5rem;
+        }
+        .sidebar-title i { color: var(--quantum); }
+
+        .section { margin-bottom: 2rem; }
+        .section-title {
+            font-size: 1rem; margin-bottom: 1rem; color: #b0bec5;
+            display: flex; align-items: center; gap: 0.5rem;
+        }
+        .section-content {
+            background: rgba(13, 27, 42, 0.6); border-radius: 8px; padding: 1rem;
+            border: 1px solid var(--panel-border);
+        }
+
+        main {
+            grid-area: main; padding: 2rem; overflow-y: auto; display: flex;
+            flex-direction: column; gap: 2rem; background: rgba(13, 27, 42, 0.3);
+        }
+
+        .dashboard-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem;
+        }
+
+        .card {
+            background: var(--panel-bg); backdrop-filter: blur(10px); border-radius: 12px;
+            padding: 1.5rem; border: 1px solid var(--panel-border);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3); }
+
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+        .card-title { font-size: 1.1rem; font-weight: 600; }
+        .card-icon {
+            width: 40px; height: 40px; border-radius: 8px; display: flex;
+            align-items: center; justify-content: center; background: var(--quantum); color: white;
+        }
+        .card-content { margin-top: 1rem; }
+
+        .chart-container {
+            height: 200px; background: rgba(13, 27, 42, 0.5); border-radius: 8px;
+            margin-top: 1rem; position: relative;
+        }
+
+        .visualization-3d { height: 420px; min-height: 320px; width: 100%; border-radius: 8px; overflow: hidden; }
+        .status-indicator { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; }
+        .status-active { background: var(--success); }
+        .status-warning { background: var(--warning); }
+        .status-danger { background: var(--danger); }
+        .status-research { background: var(--research); }
+        .status-quantum { background: var(--quantum); }
+
+        .progress-bar {
+            height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px;
+            margin-top: 10px; overflow: hidden;
+        }
+        .progress { height: 100%; background: var(--quantum); border-radius: 3px; transition: width 0.3s ease; }
+
+        footer { grid-area: footer; background: var(--panel-bg); backdrop-filter: blur(10px);
+            border-top: 1px solid var(--panel-border); padding: 1rem; min-height: 280px; }
+
+        .terminal {
+            height: 100%; background: rgba(0, 0, 0, 0.7); border-radius: 8px;
+            padding: 1rem; font-family: 'Courier New', monospace; overflow-y: auto;
+        }
+        .terminal-header {
+            display: flex; justify-content: space-between; margin-bottom: 1rem; color: #b0bec5;
+        }
+        .terminal-title { font-weight: 600; }
+        .terminal-controls { display: flex; gap: 0.5rem; }
+        .terminal-control { width: 12px; height: 12px; border-radius: 50%; }
+        .control-close { background: #ff5f56; }
+        .control-minimize { background: #ffbd2e; }
+        .control-maximize { background: #27c93f; }
+        .terminal-body { height: calc(100% - 40px); }
+        .terminal-line { margin-bottom: 0.5rem; display: flex; align-items: center; }
+        .terminal-prompt { color: var(--success); margin-right: 0.5rem; }
+        .terminal-input {
+            background: transparent; border: none; color: white; font-family: 'Courier New', monospace;
+            font-size: 1rem; width: 100%; outline: none;
+        }
+        .terminal-output { color: #b0bec5; margin-top: 0.5rem; max-height: 300px; overflow-y: auto; font-size: 0.9rem; line-height: 1.4; }
+
+        /* Outils chercheurs */
+        .researcher-tools {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem; margin-top: 1.5rem;
+        }
+        .tool-card {
+            background: rgba(13, 27, 42, 0.6); border-radius: 8px; padding: 1rem;
+            border: 1px solid var(--panel-border); text-align: center; cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .tool-card:hover { background: rgba(13, 27, 42, 0.8); transform: translateY(-3px); }
+        .tool-icon { font-size: 2rem; margin-bottom: 0.5rem; color: var(--quantum); }
+        .tool-title { font-weight: 600; margin-bottom: 0.5rem; }
+        .tool-description { font-size: 0.8rem; color: #b0bec5; }
+
+        .hidden { display: none; }
+
+        /* HUD and mission timeline */
+        .hud {
+            position: absolute; right: 1rem; top: 80px; background: rgba(2,8,23,0.6);
+            padding: 0.6rem 0.8rem; border-radius: 8px; color: #cfe8ff; font-size: 0.9rem;
+            border: 1px solid rgba(255,255,255,0.06); backdrop-filter: blur(6px);
+        }
+        .hud-item { margin-bottom: 0.4rem; }
+        .mission-timeline {
+            position: absolute; left: 50%; transform: translateX(-50%); top: 78px;
+            display:flex; gap: .5rem; align-items:center; padding: .35rem .6rem; border-radius: 999px;
+            background: rgba(255,255,255,0.03); color: #cfe8ff; font-size: 0.85rem; border:1px solid rgba(255,255,255,0.04);
+        }
+        .timeline-step { padding: .25rem .6rem; border-radius:6px; opacity:0.7 }
+        .timeline-step.active { background: linear-gradient(90deg,#3949ab,#7b1fa2); opacity:1; box-shadow: 0 6px 18px rgba(59,89,152,0.25); }
+
+        @media (max-width: 1200px) {
+            .container { grid-template-columns: 1fr; grid-template-areas: "header" "main" "footer"; }
+            .sidebar { display: none; }
+        }
+
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        .pulse { animation: pulse 2s infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-spinner {
+            width: 30px; height: 30px; border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%; border-top-color: var(--quantum); animation: spin 1s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <i class="fas fa-atom"></i>
+                <h1>LABORATOIRE DE RECHERCHE SPATIALE AVANCÉE</h1>
+            </div>
+            <div class="header-controls" role="navigation" aria-label="Primary Navigation">
+                <div class="header-left">
+                    <div class="nav-group">
+                        <select id="mission-select" class="btn btn-outline mission-select" aria-label="Sélection mission">
+                            <option value="leo">Mission: Low Earth Orbit</option>
+                            <option value="moon">Mission: Lune</option>
+                        </select>
+                        <button class="btn btn-outline" id="phase-prev" title="Étape précédente"><i class="fas fa-chevron-left"></i></button>
+                        <div style="display:flex;align-items:center;gap:.5rem;color:#cfd8dc"><strong id="phase-display">Phase: —</strong></div>
+                        <button class="btn btn-outline" id="phase-next" title="Étape suivante"><i class="fas fa-chevron-right"></i></button>
+                    </div>
+                </div>
+                <div class="header-center" aria-hidden="false">
+                    <div id="mission-timeline" class="mission-timeline" role="list" aria-label="Timeline de la mission"></div>
+                </div>
+                <div class="header-right">
+                    <div class="nav-group">
+                        <button class="btn btn-quantum" id="launch-btn" title="Lancer la simulation"><i class="fas fa-rocket"></i> <span id="launch-text">Lancer</span></button>
+                        <button class="btn btn-primary" id="save-sim" title="Enregistrer la simulation"><i class="fas fa-save"></i></button>
+                        <button class="btn btn-outline" id="zoom-rocket" title="Zoom fusée"><i class="fas fa-search-plus"></i></button>
+                        <button class="btn btn-danger" id="reset-rocket" title="Réinitialiser fusée"><i class="fas fa-undo"></i></button>
+                    </div>
+                    <div class="nav-group">
+                        <button class="btn btn-outline" id="advance-btn" title="Avancer altitude"><i class="fas fa-step-forward"></i></button>
+                        <button class="btn btn-outline" id="speed-down" title="Ralentir"> <i class="fas fa-minus"></i></button>
+                        <button class="btn btn-outline" id="speed-up" title="Accélérer"> <i class="fas fa-plus"></i></button>
+                    </div>
+                    <div class="nav-group">
+                        <button class="btn btn-outline" id="mission-config" title="Configuration mission"><i class="fas fa-cogs"></i></button>
+                        <button class="btn btn-outline" id="export-data" title="Exporter données"><i class="fas fa-download"></i></button>
+                        <button class="btn btn-outline" id="toggle-fullscreen" title="Mode grand écran"><i class="fas fa-expand"></i></button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div id="hud" class="hud" aria-hidden="false">
+            <div class="hud-item" id="hud-altitude">Altitude: 0</div>
+            <div class="hud-item" id="hud-distance">Distance Lune: N/A</div>
+        </div>
+
+        <aside class="sidebar left-sidebar">
+            <h2 class="sidebar-title"><i class="fas fa-flask"></i> Laboratoire Scientifique</h2>
+            
+            <div class="section">
+                <h3 class="section-title"><i class="fas fa-calculator"></i> Calcul de Trajectoire Quantique</h3>
+                <div class="section-content">
+                    <div class="status-indicator"><div class="status-dot status-quantum pulse"></div><span>Calcul orbital quantique actif</span></div>
+                    <div class="status-indicator"><div class="status-dot status-research pulse"></div><span>Optimisation IA en cours</span></div>
+                    <div class="status-indicator"><div class="status-dot status-quantum pulse"></div><span>Simulation multi-corps</span></div>
+                    <div class="progress-bar"><div class="progress" id="trajectory-progress" style="width: 85%"></div></div>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h3 class="section-title"><i class="fas fa-satellite"></i> Paramètres Orbitaux Avancés</h3>
+                <div class="section-content">
+                    <div class="research-param"><span>Altitude:</span><span class="param-value" id="altitude-value">408.2 km</span></div>
+                    <div class="research-param"><span>Inclinaison:</span><span class="param-value" id="inclination-value">51.65°</span></div>
+                    <div class="research-param"><span>Excentricité:</span><span class="param-value" id="eccentricity-value">0.0012</span></div>
+                    <div class="research-param"><span>Période:</span><span class="param-value" id="period-value">92.68 min</span></div>
+                    <div class="research-param"><span>Régression:</span><span class="param-value" id="regression-value">-0.12°/jour</span></div>
+                    <div class="research-param"><span>Dérive RAAN:</span><span class="param-value" id="raan-value">-2.45°/jour</span></div>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h3 class="section-title"><i class="fas fa-chart-line"></i> Métriques de Recherche</h3>
+                <div class="section-content">
+                    <div class="research-param"><span>Facteur Q:</span><span class="param-value" id="q-factor">1.24</span></div>
+                    <div class="research-param"><span>Rendement ISP:</span><span class="param-value" id="isp-efficiency">98.7%</span></div>
+                    <div class="research-param"><span>ΔV Résiduel:</span><span class="param-value" id="delta-v-residual">142 m/s</span></div>
+                    <div class="research-param"><span>Marge Structurale:</span><span class="param-value" id="structural-margin">15.3%</span></div>
+                    <div class="research-param"><span>Facteur de Sécurité:</span><span class="param-value" id="safety-factor">2.1</span></div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3 class="section-title"><i class="fas fa-brain"></i> Intelligence Artificielle</h3>
+                <div class="section-content">
+                    <div class="status-indicator"><div class="status-dot status-quantum pulse"></div><span>Réseau neuronal actif</span></div>
+                    <div class="status-indicator"><div class="status-dot status-research pulse"></div><span>Apprentissage profond</span></div>
+                    <div class="status-indicator"><div class="status-dot status-active pulse"></div><span>Optimisation en temps réel</span></div>
+                    <div class="progress-bar"><div class="progress" id="ai-progress" style="width: 92%"></div></div>
+                </div>
+            </div>
+        </aside>
+
+        <main>
+            <!-- Outils pour chercheurs -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Outils de Recherche Avancée</h3>
+                    <div class="card-icon"><i class="fas fa-tools"></i></div>
+                </div>
+                <div class="card-content">
+                    <div class="researcher-tools">
+                        <div class="tool-card" id="data-analysis-tool">
+                            <div class="tool-icon"><i class="fas fa-chart-bar"></i></div>
+                            <div class="tool-title">Analyse de Données</div>
+                            <div class="tool-description">Analyses statistiques avancées et visualisation</div>
+                        </div>
+                        <div class="tool-card" id="collaboration-tool">
+                            <div class="tool-icon"><i class="fas fa-users"></i></div>
+                            <div class="tool-title">Collaboration</div>
+                            <div class="tool-description">Travail collaboratif en temps réel</div>
+                        </div>
+                        <div class="tool-card" id="simulation-history-tool">
+                            <div class="tool-icon"><i class="fas fa-history"></i></div>
+                            <div class="tool-title">Historique Simulations</div>
+                            <div class="tool-description">Accédez et comparez les simulations</div>
+                        </div>
+                        <div class="tool-card" id="export-tool">
+                            <div class="tool-icon"><i class="fas fa-file-export"></i></div>
+                            <div class="tool-title">Export de Données</div>
+                            <div class="tool-description">Exportez vos résultats</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Visualisation 3D -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Visualisation Spatiale 3D</h3>
+                    <div class="card-icon"><i class="fas fa-globe"></i></div>
+                </div>
+                <div class="card-content">
+                    <div class="visualization-3d" id="quantum-field-visualization">
+                        <div class="loading-model">
+                            <div class="loading-spinner"></div>
+                            <div>Chargement de la visualisation quantique...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Graphiques de performance -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Performance de Lancement</h3>
+                    <div class="card-icon"><i class="fas fa-rocket"></i></div>
+                </div>
+                <div class="card-content">
+                    <div class="chart-container">
+                        <canvas id="performance-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <aside class="sidebar right-sidebar">
+            <h2 class="sidebar-title"><i class="fas fa-tools"></i> Laboratoire de Recherche</h2>
+            
+            <div class="section">
+                <h3 class="section-title"><i class="fas fa-calculator"></i> Métriques de Recherche Avancée</h3>
+                <div class="section-content">
+                    <div class="research-param"><span>ΔV Quantique:</span><span class="param-value" id="quantum-delta-v">12.4 km/s</span></div>
+                    <div class="research-param"><span>Efficacité Quantique:</span><span class="param-value" id="quantum-efficiency-value">99.7%</span></div>
+                    <div class="research-param"><span>ISP Effectif:</span><span class="param-value" id="effective-isp">15,240 s</span></div>
+                    <div class="research-param"><span>Température Plasma:</span><span class="param-value" id="plasma-temp">1.2×10⁶ K</span></div>
+                    <div class="research-param"><span>Pression de Chambre:</span><span class="param-value" id="chamber-pressure">285 bar</span></div>
+                    <div class="research-param"><span>Ratio de Compression:</span><span class="param-value" id="compression-ratio">42.7:1</span></div>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h3 class="section-title"><i class="fas fa-vial"></i> Expériences en Cours</h3>
+                <div class="section-content">
+                    <div class="status-indicator"><div class="status-dot status-research pulse"></div><span>Propulsion plasma</span></div>
+                    <div class="status-indicator"><div class="status-dot status-quantum pulse"></div><span>Téléportation quantique</span></div>
+                    <div class="status-indicator"><div class="status-dot status-research pulse"></div><span>Matériaux supraconducteurs</span></div>
+                    <div class="status-indicator"><div class="status-dot status-quantum pulse"></div><span>Calculateur quantique</span></div>
+                    <div class="progress-bar"><div class="progress" id="experiments-progress" style="width: 78%"></div></div>
+                </div>
+            </div>
+        </aside>
+
+        <footer>
+            <div class="terminal">
+                <div class="terminal-header">
+                    <div class="terminal-title">CONSOLE DE RECHERCHE SPATIALE - LABORATOIRE QUANTIQUE</div>
+                    <div class="terminal-controls">
+                        <div class="terminal-control control-close"></div>
+                        <div class="terminal-control control-minimize"></div>
+                        <div class="terminal-control control-maximize"></div>
+                    </div>
+                </div>
+                <div class="terminal-body">
+                    <div class="terminal-line">
+                        <span class="terminal-prompt">research-lab:~$</span>
+                        <span class="terminal-input" id="terminal-input">Initialisation des systèmes quantiques...</span>
+                    </div>
+                    <div class="terminal-output" id="terminal-output">
+                        <div>> Système de propulsion quantique: ACTIF</div>
+                        <div>> Calculateur neuronal: OPTIMISÉ</div>
+                        <div>> Champ d'intrication: STABLE</div>
+                        <div>> Téléportation quantique: SYNCHRONISÉE</div>
+                        <div>> Analyse trajectoire multi-corps: COMPLÈTE</div>
+                        <div>> Rendement énergétique: 98.7%</div>
+                        <div>> Prêt pour le lancement de VOTRE fusée...</div>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        // État global de l'application
+        const appState = {
+            simulations: { 
+                launch: { 
+                    isRunning: false, 
+                    threeD: { active: false, progress: 0, speed: 80, targetAltitude: 800, cameraOffset: 220,
+                              mode: 'idle', horizontalSpeed: 200, horizontalTarget: 420, pitchStartX: 180 },
+                    // phases control
+                    phases: ['Allumage moteurs', 'Décollage', 'Max Q', 'Séparation boosters', 'Mise en orbite'],
+                    currentPhaseIndex: -1,
+                    autoPhase: false
+                } 
+            },
+            data: {
+                orbital: { altitude: { value: 408.2 }, inclination: { value: 51.65 } },
+                research: { qFactor: { value: 1.24 }, ispEfficiency: { value: 98.7 } }
+            }
+        };
+
+        // Initialisation
+        let scene, camera, renderer, controls;
+        let rocketMesh = null;
+        let rocketExhaust = null;
+        const threeClock = new THREE.Clock();
+        // Smoke / particles
+        let smokeGeo = null;
+        let smokeMaterial = null;
+        let smokePoints = null;
+        const maxSmokeParticles = 300;
+        const smokePositions = new Float32Array(maxSmokeParticles * 3);
+        const smokeLife = new Float32Array(maxSmokeParticles);
+        const smokeVel = new Float32Array(maxSmokeParticles * 3);
+            // Moon
+            let moonMesh = null;
+            // Trajectory line
+            let trajectoryLine = null;
+            let trajectoryGeo = null;
+            // Zoom mode storage (supports animated tween)
+            let zoomMode = { active: false, prevCamPos: null, prevTarget: null, prevFov: null, tweening: false, startTime: 0, duration: 0.8, from: null, to: null, fromTarget: null, toTarget: null, fromFov: null, toFov: null };
+            // Launch effects
+            let flameParticles = [];
+            let rocketGlowLight = null;
+            let launchShakeState = { active: false, intensity: 0 };
+
+        document.addEventListener('DOMContentLoaded', function() {
+            initEventListeners();
+            initCharts();
+            startDataUpdates();
+            init3DVisualization();
+            buildTimelineUI();
+            addTerminalOutput('> Laboratoire spatial initialisé avec succès');
+        });
+
+        function init3DVisualization() {
+            const container = document.getElementById('quantum-field-visualization');
+            if (!container) return;
+
+            // Défauts de taille si le container n'est pas encore rendu
+            let width = container.clientWidth;
+            let height = container.clientHeight;
+            if (!width || !height) {
+                width = Math.max(640, width);
+                height = Math.max(360, height || 420);
+            }
+
+            // Configuration de la scène
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0d1b2a);
+            // subtle starfield background (points)
+            const starsGeo = new THREE.BufferGeometry();
+            const starCount = 800;
+            const starPositions = new Float32Array(starCount * 3);
+            for (let i = 0; i < starCount; i++) {
+                const r = 1200;
+                const theta = Math.random() * Math.PI * 2;
+                const phi = (Math.random() - 0.5) * Math.PI;
+                starPositions[i * 3 + 0] = Math.cos(theta) * Math.cos(phi) * r;
+                starPositions[i * 3 + 1] = Math.sin(phi) * r * 0.5 + 200; // bias upward
+                starPositions[i * 3 + 2] = Math.sin(theta) * Math.cos(phi) * r;
+            }
+            starsGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+            const starsMat = new THREE.PointsMaterial({ color: 0xffffff, size: 1.2, opacity: 0.9, transparent: true });
+            const stars = new THREE.Points(starsGeo, starsMat);
+            scene.add(stars);
+            
+            camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+            camera.position.set(0, 100, 150);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(width, height);
+            renderer.shadowMap.enabled = true;
+            container.innerHTML = '';
+            container.appendChild(renderer.domElement);
+
+            // Contrôles
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.autoRotate = true;
+            controls.autoRotateSpeed = 2;
+            controls.enableZoom = true;
+
+            // Lumières
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(100, 100, 100);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            scene.add(directionalLight);
+
+            const pointLight = new THREE.PointLight(0x00bcd4, 0.5);
+            pointLight.position.set(-100, 50, 100);
+            scene.add(pointLight);
+
+            // Ground / Launchpad
+            const groundGeo = new THREE.PlaneGeometry(4000, 4000);
+            const groundMat = new THREE.MeshStandardMaterial({ color: 0x0b1320, roughness: 0.9, metalness: 0.1 });
+            const ground = new THREE.Mesh(groundGeo, groundMat);
+            ground.rotation.x = -Math.PI / 2;
+            ground.position.y = -60;
+            ground.receiveShadow = true;
+            scene.add(ground);
+
+            // Simple launch pad
+            const padGeo = new THREE.BoxGeometry(80, 10, 80);
+            const padMat = new THREE.MeshStandardMaterial({ color: 0x222831, roughness: 0.7, metalness: 0.5 });
+            const pad = new THREE.Mesh(padGeo, padMat);
+            pad.position.set(0, -5, 0);
+            pad.receiveShadow = true;
+            pad.castShadow = true;
+            scene.add(pad);
+
+            // pad details (pillars)
+            const pillarGeo = new THREE.BoxGeometry(6, 40, 6);
+            const pillarMat = new THREE.MeshStandardMaterial({ color: 0x1f2a44, roughness: 0.6 });
+            const p1 = new THREE.Mesh(pillarGeo, pillarMat); p1.position.set(30, 15, 30);
+            const p2 = p1.clone(); p2.position.set(-30, 15, 30);
+            const p3 = p1.clone(); p3.position.set(30, 15, -30);
+            const p4 = p1.clone(); p4.position.set(-30, 15, -30);
+            [p1, p2, p3, p4].forEach(p => { p.castShadow = true; scene.add(p); });
+
+            // Launch glow light (off initially)
+            rocketGlowLight = new THREE.PointLight(0xff6a00, 0, 400);
+            rocketGlowLight.position.set(0, 0, 0);
+            rocketGlowLight.castShadow = true;
+            scene.add(rocketGlowLight);
+
+            // Prepare smoke particle system
+            createSmokeSystem();
+            // create moon but keep hidden by default
+            createMoon();
+            // create trajectory line (rocket -> moon)
+            createTrajectory();
+            // create flame particle system
+            createFlameSystem();
+
+            // Charger le modèle STL
+            try {
+                const loader = new THREE.STLLoader();
+                loader.load('rocket_model.stl', function(geometry) {
+                    try {
+                        if (geometry.computeVertexNormals) geometry.computeVertexNormals();
+                        if (geometry.center) geometry.center();
+
+                        const material = new THREE.MeshPhongMaterial({ 
+                            color: 0x00bcd4,
+                            specular: 0x111111,
+                            shininess: 200
+                        });
+
+                        // stocker le mesh globalement pour pouvoir l'animer
+                        rocketMesh = new THREE.Mesh(geometry, material);
+                        rocketMesh.castShadow = true;
+                        rocketMesh.receiveShadow = true;
+                        rocketMesh.scale.set(1, 1, 1);
+                        // position initiale : fusée couchée horizontalement sur le pas de tir
+                        rocketMesh.rotation.z = Math.PI / 2; // 90deg => laid horizontal
+                        rocketMesh.position.set(-140, 0, 0);
+
+                        scene.add(rocketMesh);
+
+                        // créer un simple cône d'échappement (effet visuel)
+                        const coneGeom = new THREE.ConeGeometry(8, 20, 16);
+                        const coneMat = new THREE.MeshBasicMaterial({ color: 0xff6a00, transparent: true, opacity: 0.9 });
+                        rocketExhaust = new THREE.Mesh(coneGeom, coneMat);
+                        rocketExhaust.rotation.x = Math.PI; // pointer vers le bas
+                        rocketExhaust.position.set(0, -30, 0);
+                        rocketExhaust.visible = false;
+                        rocketMesh.add(rocketExhaust);
+                        addTerminalOutput('> Modèle 3D de la fusée chargé avec succès');
+
+                        // Ajuster la caméra pour voir le modèle
+                        const boundingBox = new THREE.Box3().setFromObject(rocketMesh);
+                        const size = boundingBox.getSize(new THREE.Vector3());
+                        const distance = Math.max(size.x, size.y, size.z) * 2;
+                        if (Number.isFinite(distance) && distance > 0) camera.position.z = distance;
+                        controls.target.copy(boundingBox.getCenter(new THREE.Vector3()));
+                        controls.update();
+                    } catch (innerErr) {
+                        console.error('Erreur lors du traitement du STL :', innerErr);
+                        addTerminalOutput('> Erreur: traitement du modèle 3D échoué');
+                    }
+                }, undefined, function(error) {
+                    console.error('Erreur lors du chargement du modèle STL:', error);
+                    addTerminalOutput('> Erreur: Impossible de charger le modèle 3D');
+                });
+            } catch (e) {
+                console.error('STLLoader indisponible ou autre erreur:', e);
+                addTerminalOutput('> Erreur: STLLoader indisponible');
+            }
+
+            // Smoke update will be handled in animate loop (createSmokeSystem called earlier)
+
+            // Boucle d'animation
+            animate();
+
+            // Redimensionner quand la fenêtre change
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const delta = threeClock.getDelta();
+
+            // handle zoom tweening
+            if (zoomMode.tweening) {
+                const now = performance.now() / 1000;
+                const t = Math.min(1, (now - zoomMode.startTime) / zoomMode.duration);
+                // lerp camera position
+                camera.position.lerpVectors(zoomMode.from, zoomMode.to, t);
+                // lerp target
+                controls.target.lerpVectors(zoomMode.fromTarget, zoomMode.toTarget, t);
+                // lerp fov
+                camera.fov = zoomMode.fromFov + (zoomMode.toFov - zoomMode.fromFov) * t;
+                camera.updateProjectionMatrix();
+                controls.update();
+                if (t >= 1) {
+                    zoomMode.tweening = false;
+                    zoomMode.active = (zoomMode.toFov < zoomMode.fromFov);
+                }
+            }
+
+            // Si la simulation de lancement Three.js est active, animer la fusée
+            const launchState = appState.simulations.launch;
+            if (launchState && launchState.threeD && rocketMesh) {
+                const td = launchState.threeD;
+
+                // Horizontal run: translate along X while laying horizontal, then pitch up
+                if (td.mode === 'horizontal') {
+                    // ensure exhaust visible
+                    if (rocketExhaust) rocketExhaust.visible = true;
+
+                    // move forward along X
+                    rocketMesh.position.x += (td.horizontalSpeed || 150) * delta;
+
+                    // when reaching pitchStartX, begin pitching toward vertical
+                    if (!td._pitching && rocketMesh.position.x >= (td.pitchStartX || 180)) {
+                        td._pitching = true;
+                    }
+
+                    if (td._pitching) {
+                        // rotate from Math.PI/2 toward 0
+                        const rot = rocketMesh.rotation.z;
+                        const rotSpeed = (Math.PI / 2) / 3.5; // complete pitch in ~3.5s
+                        rocketMesh.rotation.z = Math.max(0, rot - rotSpeed * delta);
+                        // when finished pitch, switch to vertical mode
+                        if (rocketMesh.rotation.z <= 0.02) {
+                            rocketMesh.rotation.z = 0;
+                            td.mode = 'vertical';
+                            td.progress = rocketMesh.position.y; // baseline
+                            // small camera reposition
+                            camera.position.set(rocketMesh.position.x - 80, rocketMesh.position.y + 60, rocketMesh.position.z + (td.cameraOffset || 220));
+                            controls.target.copy(rocketMesh.position);
+                            controls.update();
+                        }
+                    } else {
+                        // camera follows the horizontal motion
+                        const desiredCamPos = new THREE.Vector3(rocketMesh.position.x - 200, rocketMesh.position.y + 60, rocketMesh.position.z + (td.cameraOffset || 220));
+                        camera.position.lerp(desiredCamPos, Math.min(1, 2 * delta));
+                        controls.target.lerp(rocketMesh.position, Math.min(1, 2 * delta));
+                    }
+                }
+
+                // Vertical ascent mode (or fallback when td.active true)
+                if (td.mode === 'vertical' || td.active) {
+                    if (rocketExhaust) rocketExhaust.visible = true;
+
+                    const speed = td.speed || 40; // units/sec upward
+                    td.progress = (td.progress || 0) + speed * delta;
+                    rocketMesh.position.y = td.progress;
+
+                    // slight rotation for visual (roll)
+                    rocketMesh.rotation.z += 0.3 * delta;
+
+                    // camera follow
+                    const desiredCamPos = new THREE.Vector3(rocketMesh.position.x, rocketMesh.position.y + 50, rocketMesh.position.z + (td.cameraOffset || 200));
+                    camera.position.lerp(desiredCamPos, Math.min(1, 2 * delta));
+                    controls.target.lerp(rocketMesh.position, Math.min(1, 2 * delta));
+
+                    // stop when reach target altitude
+                    const targetAltitude = td.targetAltitude || 800;
+                    if (rocketMesh.position.y >= targetAltitude) {
+                        td.active = false;
+                        td.mode = 'idle';
+                        if (rocketExhaust) rocketExhaust.visible = false;
+                        addTerminalOutput('> Phase 3D: fusée en orbite simulée');
+                        camera.position.set(0, 100, 150);
+                        controls.target.set(0, 0, 0);
+                        controls.update();
+                        completeLaunchSimulation();
+                    }
+                }
+            }
+
+            // Update smoke if active
+            if (appState.simulations.launch.threeD && appState.simulations.launch.threeD.smokeActive) {
+                // spawn a few particles per frame depending on intensity
+                const intensity = 6;
+                for (let i = 0; i < intensity; i++) spawnSmokeParticle();
+                updateSmoke(delta);
+            }
+
+            // Spawn flame particles during launch phases
+            const currentPhase = launchState.phases[launchState.currentPhaseIndex];
+            if (launchState.isRunning && launchState.threeD && launchState.threeD.active) {
+                if (currentPhase === 'Allumage moteurs' || currentPhase === 'Décollage') {
+                    // spawn multiple flame particles per frame
+                    for (let i = 0; i < 8; i++) spawnFlameParticle();
+                    // update glow light intensity
+                    if (rocketGlowLight) rocketGlowLight.intensity = 1.2;
+                } else if (currentPhase === 'Max Q') {
+                    // intense flames
+                    for (let i = 0; i < 12; i++) spawnFlameParticle();
+                    if (rocketGlowLight) rocketGlowLight.intensity = 1.5;
+                } else {
+                    if (rocketGlowLight) rocketGlowLight.intensity = Math.max(0, rocketGlowLight.intensity - 0.3 * delta);
+                }
+            }
+            
+            // Update flame particles
+            updateFlameParticles();
+
+            // Apply camera shake during intense phases
+            if (launchState.isRunning && launchState.threeD && launchState.threeD.active) {
+                if (currentPhase === 'Allumage moteurs' || currentPhase === 'Max Q') {
+                    // Apply random camera shake
+                    const shakeAmount = 0.8;
+                    const shakeX = (Math.random() - 0.5) * shakeAmount;
+                    const shakeY = (Math.random() - 0.5) * shakeAmount;
+                    camera.position.x += shakeX;
+                    camera.position.y += shakeY;
+                }
+            }
+
+            // Update HUD values (altitude / distance)
+            updateHUD();
+
+            // Update trajectory line if visible
+            if (trajectoryLine && trajectoryLine.visible && rocketMesh && moonMesh) {
+                const pos = rocketMesh.getWorldPosition(new THREE.Vector3());
+                const mpos = moonMesh.getWorldPosition(new THREE.Vector3());
+                const arr = trajectoryGeo.attributes.position.array;
+                arr[0] = pos.x; arr[1] = pos.y; arr[2] = pos.z;
+                arr[3] = mpos.x; arr[4] = mpos.y; arr[5] = mpos.z;
+                trajectoryGeo.attributes.position.needsUpdate = true;
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // --- Smoke system ---
+        function createSmokeSystem() {
+            smokeGeo = new THREE.BufferGeometry();
+            // initialize positions offscreen
+            for (let i = 0; i < maxSmokeParticles; i++) {
+                smokePositions[i * 3 + 0] = 9999;
+                smokePositions[i * 3 + 1] = 9999;
+                smokePositions[i * 3 + 2] = 9999;
+                smokeLife[i] = 0;
+                smokeVel[i * 3 + 0] = 0;
+                smokeVel[i * 3 + 1] = 0;
+                smokeVel[i * 3 + 2] = 0;
+            }
+            smokeGeo.setAttribute('position', new THREE.BufferAttribute(smokePositions, 3));
+            smokeMaterial = new THREE.PointsMaterial({ color: 0xaaaaaa, size: 12, transparent: true, opacity: 0.6, depthWrite: false });
+            smokePoints = new THREE.Points(smokeGeo, smokeMaterial);
+            smokePoints.frustumCulled = false;
+            scene.add(smokePoints);
+        }
+
+        function spawnSmokeParticle() {
+            // find a dead particle
+            for (let i = 0; i < maxSmokeParticles; i++) {
+                if (smokeLife[i] <= 0) {
+                    const idx3 = i * 3;
+                    const baseX = (rocketMesh ? rocketMesh.position.x : 0) + (Math.random() - 0.5) * 6;
+                    const baseY = (rocketMesh ? rocketMesh.position.y : 0) - 30;
+                    const baseZ = (rocketMesh ? rocketMesh.position.z : 0) + (Math.random() - 0.5) * 6;
+                    smokePositions[idx3 + 0] = baseX;
+                    smokePositions[idx3 + 1] = baseY;
+                    smokePositions[idx3 + 2] = baseZ;
+                    // upward velocity with spread
+                    smokeVel[idx3 + 0] = (Math.random() - 0.5) * 6;
+                    smokeVel[idx3 + 1] = 40 + Math.random() * 40;
+                    smokeVel[idx3 + 2] = (Math.random() - 0.5) * 6;
+                    smokeLife[i] = 1.2 + Math.random() * 1.6; // seconds
+                    break;
+                }
+            }
+        }
+
+        function updateSmoke(delta) {
+            let updated = false;
+            for (let i = 0; i < maxSmokeParticles; i++) {
+                if (smokeLife[i] > 0) {
+                    const idx3 = i * 3;
+                    smokeLife[i] -= delta;
+                    smokePositions[idx3 + 0] += smokeVel[idx3 + 0] * delta;
+                    smokePositions[idx3 + 1] += smokeVel[idx3 + 1] * delta;
+                    smokePositions[idx3 + 2] += smokeVel[idx3 + 2] * delta;
+                    // slow down and spread
+                    smokeVel[idx3 + 0] *= 0.98;
+                    smokeVel[idx3 + 1] *= 0.98;
+                    smokeVel[idx3 + 2] *= 0.98;
+                    // fade out by adjusting material opacity slightly
+                    updated = true;
+                } else {
+                    // keep offscreen
+                    const idx3 = i * 3;
+                    smokePositions[idx3 + 0] = 9999;
+                }
+            }
+            if (updated && smokeGeo) {
+                smokeGeo.attributes.position.needsUpdate = true;
+            }
+        }
+
+        // --- Moon creation and mission handling ---
+        function createMoon() {
+            const radius = 60; // visual scale
+            const moonGeo = new THREE.SphereGeometry(radius, 32, 32);
+            const moonMat = new THREE.MeshStandardMaterial({ color: 0xdcdcdc, metalness: 0.1, roughness: 0.9 });
+            moonMesh = new THREE.Mesh(moonGeo, moonMat);
+            // position the moon far in the scene (aligned on z axis)
+            moonMesh.position.set(0, 200, -900);
+            moonMesh.visible = false;
+            scene.add(moonMesh);
+            // subtle light on moon
+            const moonLight = new THREE.PointLight(0xffffff, 0.4);
+            moonLight.position.copy(moonMesh.position).add(new THREE.Vector3(200, 100, 0));
+            scene.add(moonLight);
+        }
+
+        function selectMission(key) {
+            addTerminalOutput('> Mission sélectionnée: ' + key);
+            if (key === 'moon') {
+                if (moonMesh) moonMesh.visible = true;
+                // set target altitude to reach moon in scene units
+                appState.simulations.launch.threeD.targetAltitude = 1000;
+                appState.simulations.launch.threeD.cameraOffset = 600;
+            } else {
+                if (moonMesh) moonMesh.visible = false;
+                appState.simulations.launch.threeD.targetAltitude = 800;
+                appState.simulations.launch.threeD.cameraOffset = 220;
+            }
+            // show/hide trajectory
+            if (trajectoryLine) trajectoryLine.visible = (key === 'moon');
+            updatePhaseDisplay();
+        }
+
+        function createTrajectory() {
+            const material = new THREE.LineBasicMaterial({ color: 0xffcc66, linewidth: 2, transparent: true, opacity: 0.9 });
+            trajectoryGeo = new THREE.BufferGeometry();
+            const pts = new Float32Array(2 * 3); // two points
+            trajectoryGeo.setAttribute('position', new THREE.BufferAttribute(pts, 3));
+            trajectoryLine = new THREE.Line(trajectoryGeo, material);
+            trajectoryLine.visible = false;
+            scene.add(trajectoryLine);
+        }
+
+        function createFlameSystem() {
+            // Initialize flame particle system with BufferGeometry
+            const flameGeometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(300 * 3); // max 300 flame particles
+            flameGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            
+            // Orange to yellow gradient material
+            const flameMaterial = new THREE.PointsMaterial({
+                size: 2.5,
+                color: 0xff9900,
+                transparent: true,
+                opacity: 0.8,
+                sizeAttenuation: true
+            });
+            
+            const flameMesh = new THREE.Points(flameGeometry, flameMaterial);
+            scene.add(flameMesh);
+            
+            return { mesh: flameMesh, geometry: flameGeometry, positions: positions };
+        }
+
+        function spawnFlameParticle() {
+            if (flameParticles.length >= 300) return; // max particles
+            
+            const now = performance.now();
+            const rocketPos = rocketMesh ? rocketMesh.position : { x: 0, y: 0, z: 0 };
+            
+            // Spawn below rocket (downward flame effect)
+            const angle = Math.random() * Math.PI * 2;
+            const radius = Math.random() * 8;
+            
+            const particle = {
+                x: rocketPos.x + Math.cos(angle) * radius,
+                y: rocketPos.y - 12 - Math.random() * 5,
+                z: rocketPos.z + Math.sin(angle) * radius,
+                vx: (Math.random() - 0.5) * 15,
+                vy: -(15 + Math.random() * 20), // downward velocity
+                vz: (Math.random() - 0.5) * 15,
+                birth: now,
+                life: 400 + Math.random() * 300 // 0.4-0.7 seconds
+            };
+            
+            flameParticles.push(particle);
+        }
+
+        function updateFlameParticles() {
+            const now = performance.now();
+            
+            if (!flameParticles.length) return;
+            
+            let flameMesh = null;
+            scene.traverse((obj) => {
+                if (obj.type === 'Points' && obj !== smokeMesh) {
+                    flameMesh = obj;
+                }
+            });
+            
+            if (!flameMesh) return;
+            
+            const positions = flameMesh.geometry.attributes.position.array;
+            
+            for (let i = flameParticles.length - 1; i >= 0; i--) {
+                const p = flameParticles[i];
+                const age = now - p.birth;
+                
+                if (age > p.life) {
+                    flameParticles.splice(i, 1);
+                } else {
+                    const lifeRatio = age / p.life;
+                    
+                    // Update position
+                    positions[i * 3] = p.x;
+                    positions[i * 3 + 1] = p.y;
+                    positions[i * 3 + 2] = p.z;
+                    
+                    // Apply physics
+                    p.x += p.vx * 0.016;
+                    p.y += p.vy * 0.016;
+                    p.z += p.vz * 0.016;
+                    p.vy -= 9.8 * 0.016; // gravity
+                }
+            }
+            
+            flameMesh.geometry.attributes.position.needsUpdate = true;
+            flameMesh.geometry.setDrawRange(0, flameParticles.length);
+        }
+
+        function updateHUD() {
+            const altEl = document.getElementById('hud-altitude');
+            const distEl = document.getElementById('hud-distance');
+            if (altEl) {
+                const alt = rocketMesh ? Math.max(0, Math.round(rocketMesh.position.y)) : 0;
+                altEl.textContent = 'Altitude: ' + alt + ' units';
+            }
+            if (distEl) {
+                if (moonMesh && rocketMesh && moonMesh.visible) {
+                    const mpos = moonMesh.getWorldPosition(new THREE.Vector3());
+                    const rpos = rocketMesh.getWorldPosition(new THREE.Vector3());
+                    const dist = Math.round(mpos.distanceTo(rpos));
+                    distEl.textContent = 'Distance Lune: ' + dist + ' units';
+                } else {
+                    distEl.textContent = 'Distance Lune: N/A';
+                }
+            }
+        }
+
+        function onWindowResize() {
+            const container = document.getElementById('quantum-field-visualization');
+            if (!container) return;
+            
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+            
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+        }
+
+        function initEventListeners() {
+            document.getElementById('toggle-fullscreen')?.addEventListener('click', toggleFullscreenMode);
+            document.getElementById('launch-btn')?.addEventListener('click', toggleLaunchSimulation);
+            document.getElementById('quantum-sim')?.addEventListener('click', startQuantumSimulation);
+            document.getElementById('data-analysis-tool')?.addEventListener('click', showDataAnalysis);
+            document.getElementById('export-tool')?.addEventListener('click', showExportPanel);
+            document.getElementById('advance-btn')?.addEventListener('click', advanceLaunchStep);
+            document.getElementById('speed-up')?.addEventListener('click', () => changeSpeed(20));
+            document.getElementById('speed-down')?.addEventListener('click', () => changeSpeed(-20));
+            document.getElementById('reset-rocket')?.addEventListener('click', resetRocket);
+            document.getElementById('phase-next')?.addEventListener('click', advancePhase);
+            document.getElementById('phase-prev')?.addEventListener('click', previousPhase);
+            document.getElementById('mission-select')?.addEventListener('change', (e) => selectMission(e.target.value));
+            document.getElementById('zoom-rocket')?.addEventListener('click', toggleZoomRocketMode);
+            document.getElementById('save-sim')?.addEventListener('click', saveSimulationToDB);
+        }
+
+        // Build timeline UI from current phases
+        function buildTimelineUI() {
+            const container = document.getElementById('mission-timeline');
+            if (!container) return;
+            container.innerHTML = '';
+            const phases = appState.simulations.launch.phases;
+            phases.forEach((p, i) => {
+                const span = document.createElement('div');
+                span.className = 'timeline-step';
+                span.textContent = p;
+                span.dataset.index = i;
+                span.addEventListener('click', () => {
+                    appState.simulations.launch.currentPhaseIndex = i - 1; // ensure advance moves to clicked
+                    advancePhase();
+                });
+                container.appendChild(span);
+            });
+            updatePhaseDisplay();
+        }
+
+        function toggleFullscreenMode() {
+            document.body.classList.toggle('fullscreen-mode');
+            const btn = document.getElementById('toggle-fullscreen');
+            if (btn) {
+                btn.innerHTML = document.body.classList.contains('fullscreen-mode') ? 
+                    '<i class="fas fa-compress"></i> Mode Normal' : 
+                    '<i class="fas fa-expand"></i> Mode Grand Écran';
+            }
+        }
+
+        function toggleLaunchSimulation() {
+            const launchState = appState.simulations.launch;
+            const btn = document.getElementById('launch-btn');
+            const text = document.getElementById('launch-text');
+
+            if (launchState.isRunning) {
+                stopLaunchSimulation();
+                btn?.classList.replace('btn-danger', 'btn-quantum');
+                text.textContent = 'Lancer Simulation';
+            } else {
+                startLaunchSimulation();
+                btn?.classList.replace('btn-quantum', 'btn-danger');
+                text.textContent = 'Arrêter Simulation';
+            }
+        }
+
+        function startLaunchSimulation() {
+            appState.simulations.launch.isRunning = true;
+            addTerminalOutput('> Démarrage de la simulation de lancement...');
+            
+            let countdown = 10;
+            const countdownInterval = setInterval(() => {
+                addTerminalOutput('> T-' + countdown + ' secondes');
+                countdown--;
+                
+                if (countdown < 0) {
+                    clearInterval(countdownInterval);
+                    addTerminalOutput('> LANCEMENT!');
+                    // Préparer l'animation 3D (la phase 'Décollage' activera le mode horizontal)
+                    try {
+                        appState.simulations.launch.threeD.progress = 0;
+                        appState.simulations.launch.threeD.mode = 'idle';
+                    } catch (e) {
+                        console.warn("Impossible d'initialiser l'état 3D:", e);
+                    }
+                    simulateLaunchPhase();
+                }
+            }, 1000);
+        }
+
+        function stopLaunchSimulation() {
+            appState.simulations.launch.isRunning = false;
+            addTerminalOutput('> Simulation arrêtée');
+        }
+
+        function simulateLaunchPhase() {
+            // Automatic progression through phases using appState phases
+            const phases = appState.simulations.launch.phases;
+            appState.simulations.launch.autoPhase = true;
+            // start from current index+1
+            const phaseInterval = setInterval(() => {
+                if (!appState.simulations.launch.autoPhase) {
+                    clearInterval(phaseInterval);
+                    return;
+                }
+                const nextIndex = Math.min(appState.simulations.launch.currentPhaseIndex + 1, phases.length - 1);
+                if (nextIndex <= appState.simulations.launch.currentPhaseIndex) {
+                    // reached end
+                    clearInterval(phaseInterval);
+                    addTerminalOutput('> Mission accomplie!');
+                    completeLaunchSimulation();
+                    return;
+                }
+                appState.simulations.launch.currentPhaseIndex = nextIndex;
+                runPhase(phases[nextIndex]);
+                if (nextIndex === phases.length - 1) {
+                    clearInterval(phaseInterval);
+                    addTerminalOutput('> Mission accomplie!');
+                    completeLaunchSimulation();
+                }
+            }, 1200); // accelerated to 1.2 seconds for dramatic effect
+        }
+
+        function runPhase(phaseName) {
+            addTerminalOutput('> ' + phaseName);
+            // visual/3D side-effects per phase with detailed messages
+            if (phaseName === 'Allumage moteurs') {
+                addTerminalOutput('  ├─ Chambre de combustion: pressurisation...');
+                addTerminalOutput('  ├─ Débit carburant: rampe-up en cours');
+                addTerminalOutput('  └─ Poussée: 0 → 100% en 2.5s');
+                try { appState.simulations.launch.threeD.smokeActive = true; } catch (e) {}
+                if (rocketExhaust) rocketExhaust.visible = true;
+            }
+            if (phaseName === 'Décollage') {
+                addTerminalOutput('  ├─ Altitude: 0 m');
+                addTerminalOutput('  ├─ Vitesse: 0 → 180 m/s');
+                addTerminalOutput('  ├─ Accélération: 4.5 G');
+                addTerminalOutput('  └─ Mode: Accélération horizontale + pitch');
+                try { 
+                    appState.simulations.launch.threeD.mode = 'horizontal';
+                    appState.simulations.launch.threeD.active = true;
+                    appState.simulations.launch.threeD._pitching = false;
+                    appState.simulations.launch.threeD.progress = appState.simulations.launch.threeD.progress || 0;
+                } catch (e) {}
+            }
+            if (phaseName === 'Max Q') {
+                addTerminalOutput('  ├─ Pression dynamique maximale');
+                addTerminalOutput('  ├─ Vitesse: 350 m/s');
+                addTerminalOutput('  ├─ Altitude: 8,500 m');
+                addTerminalOutput('  └─ Secousse structurale: ✓ INTENSE');
+                // slight camera kick effect
+                const save = camera.position.clone();
+                const shake = () => {
+                    camera.position.x += (Math.random() - 0.5) * 4;
+                    camera.position.z += (Math.random() - 0.5) * 4;
+                };
+                // quick shake sequence
+                for (let i = 0; i < 6; i++) setTimeout(shake, i * 120);
+                setTimeout(() => { camera.position.copy(save); controls.update(); }, 1000);
+            }
+            if (phaseName === 'Séparation boosters') {
+                addTerminalOutput('  ├─ Carburant boosters: épuisé');
+                addTerminalOutput('  ├─ Séparation: activée');
+                addTerminalOutput('  └─ Étage principal: allumé (rétro-fusées)');
+                // small visual: spawn a few smoke puffs
+                for (let i = 0; i < 20; i++) spawnSmokeParticle();
+            }
+            if (phaseName === 'Mise en orbite') {
+                addTerminalOutput('  ├─ Altitude cible: 400 km (orbite basse)');
+                addTerminalOutput('  ├─ Vitesse orbitale: 7,700 m/s');
+                addTerminalOutput('  └─ Apogée/Périgée: stabilisés ✓');
+                try { appState.simulations.launch.threeD.active = false; } catch (e) {}
+                try { appState.simulations.launch.threeD.smokeActive = false; } catch (e) {}
+                if (rocketExhaust) rocketExhaust.visible = false;
+            }
+            updatePhaseDisplay();
+        }
+
+        function advancePhase() {
+            const state = appState.simulations.launch;
+            const phases = state.phases;
+            if (state.currentPhaseIndex < phases.length - 1) {
+                state.currentPhaseIndex += 1;
+                runPhase(phases[state.currentPhaseIndex]);
+            } else {
+                addTerminalOutput('> Déjà à la dernière phase');
+            }
+        }
+
+        function previousPhase() {
+            const state = appState.simulations.launch;
+            if (state.currentPhaseIndex > 0) {
+                state.currentPhaseIndex -= 1;
+                runPhase(state.phases[state.currentPhaseIndex]);
+            } else {
+                addTerminalOutput('> Déjà à la première phase');
+            }
+        }
+
+        function updatePhaseDisplay() {
+            const el = document.getElementById('phase-display');
+            const s = appState.simulations.launch;
+            if (!el) return;
+            if (s.currentPhaseIndex < 0) el.textContent = 'Phase: —';
+            else el.textContent = 'Phase: ' + s.phases[s.currentPhaseIndex];
+            // update timeline highlight
+            const timeline = document.getElementById('mission-timeline');
+            if (timeline) {
+                Array.from(timeline.children).forEach((child, idx) => {
+                    child.classList.toggle('active', idx === s.currentPhaseIndex);
+                });
+            }
+        }
+
+        // --- Zoom mode for rocket ---
+        function toggleZoomRocketMode() {
+            if (!rocketMesh) { addTerminalOutput('> Zoom demandé mais modèle non chargé'); return; }
+            const cam = camera;
+            if (!zoomMode.active) {
+                // store previous
+                zoomMode.prevCamPos = cam.position.clone();
+                zoomMode.prevTarget = controls.target.clone();
+                zoomMode.prevFov = cam.fov;
+                // move camera close to rocket
+                const targetPos = rocketMesh.getWorldPosition(new THREE.Vector3());
+                const zoomPos = targetPos.clone().add(new THREE.Vector3(0, 30, 60));
+                cam.position.copy(zoomPos);
+                cam.fov = 40;
+                cam.updateProjectionMatrix();
+                controls.target.copy(targetPos);
+                controls.update();
+                zoomMode.active = true;
+                addTerminalOutput('> Mode Zoom activé');
+            } else {
+                // restore
+                if (zoomMode.prevCamPos) cam.position.copy(zoomMode.prevCamPos);
+                if (zoomMode.prevTarget) controls.target.copy(zoomMode.prevTarget);
+                if (zoomMode.prevFov) { cam.fov = zoomMode.prevFov; cam.updateProjectionMatrix(); }
+                controls.update();
+                zoomMode.active = false;
+                addTerminalOutput('> Mode Zoom désactivé');
+            }
+        }
+
+        function completeLaunchSimulation() {
+            appState.simulations.launch.isRunning = false;
+            const btn = document.getElementById('launch-btn');
+            const text = document.getElementById('launch-text');
+            btn?.classList.replace('btn-danger', 'btn-quantum');
+            text.textContent = 'Lancer Simulation';
+        }
+
+        function startQuantumSimulation() {
+            addTerminalOutput('> Démarrage simulation quantique...');
+            addTerminalOutput('> Intrication quantique initialisée');
+            addTerminalOutput('> Champ de Higgs stabilisé');
+        }
+
+        function showDataAnalysis() {
+            addTerminalOutput('> Outil d\'analyse de données ouvert');
+        }
+
+        function showExportPanel() {
+            addTerminalOutput('> Panneau d\'export de données ouvert');
+        }
+
+        function initCharts() {
+            const ctx = document.getElementById('performance-chart')?.getContext('2d');
+            if (ctx) {
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: ['T-60', 'T-45', 'T-30', 'T-15', 'T-0', 'T+15', 'T+30'],
+                        datasets: [{
+                            label: 'Poussée (kN)',
+                            data: [0, 0, 0, 0, 7500, 7200, 6800],
+                            borderColor: '#00c853',
+                            tension: 0.4
+                        }, {
+                            label: 'Altitude (km)',
+                            data: [0, 0, 0, 0, 0, 15, 45],
+                            borderColor: '#2196f3',
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: { legend: { position: 'top' } },
+                        scales: { y: { beginAtZero: true } }
+                    }
+                });
+            }
+        }
+
+        function startDataUpdates() {
+            setInterval(() => {
+                updateResearchData();
+            }, 2000);
+        }
+
+        function updateResearchData() {
+            // Simulation de données en temps réel
+            Object.keys(appState.data.orbital).forEach(key => {
+                const param = appState.data.orbital[key];
+                param.value += (Math.random() - 0.5) * 0.1;
+                updateDisplayValue(key + '-value', param.value.toFixed(2));
+            });
+        }
+
+        function updateDisplayValue(elementId, value) {
+            const element = document.getElementById(elementId);
+            if (element) element.textContent = value;
+        }
+
+        function addTerminalOutput(message) {
+            const output = document.getElementById('terminal-output');
+            if (output) {
+                const newLine = document.createElement('div');
+                newLine.textContent = '> ' + message;
+                output.appendChild(newLine);
+                output.scrollTop = output.scrollHeight;
+            }
+        }
+
+        // --- Fonctions d'avancement / contrôle 3D ---
+        function advanceLaunchStep() {
+            const three = appState.simulations.launch.threeD;
+            const step = 80; // unité par pas
+            if (!rocketMesh) { addTerminalOutput('> Avancé manuel demandé mais modèle non chargé'); return; }
+            if (three.mode === 'horizontal') {
+                rocketMesh.position.x += step;
+                addTerminalOutput('> Avancé manuel horizontal: +' + step + ' (x=' + Math.round(rocketMesh.position.x) + ')');
+            } else {
+                three.progress = (three.progress || 0) + step;
+                rocketMesh.position.y = three.progress;
+                addTerminalOutput('> Avancé manuel vertical: +' + step + ' unités (altitude: ' + Math.round(three.progress) + ')');
+            }
+            // mettre à jour caméra immédiatement
+            camera.position.set(rocketMesh.position.x, rocketMesh.position.y + 50, rocketMesh.position.z + three.cameraOffset);
+            controls.target.copy(rocketMesh.position);
+            controls.update();
+        }
+
+        function changeSpeed(delta) {
+            const three = appState.simulations.launch.threeD;
+            three.speed = Math.max(1, (three.speed || 80) + delta);
+            addTerminalOutput('> Vitesse 3D réglée à ' + three.speed);
+        }
+
+        function resetRocket() {
+            const three = appState.simulations.launch.threeD;
+            three.progress = 0;
+            three.active = false;
+            if (rocketMesh) {
+                // reset to horizontal pad position
+                rocketMesh.position.set(-140, 0, 0);
+                rocketMesh.rotation.set(0, 0, Math.PI / 2);
+                if (rocketExhaust) rocketExhaust.visible = false;
+            }
+            // reset mode and smoke
+            three.mode = 'idle';
+            three._pitching = false;
+            three.smokeActive = false;
+            camera.position.set(0, 100, 150);
+            controls.target.set(0, 0, 0);
+            controls.update();
+            addTerminalOutput('> Fusée réinitialisée');
+        }
+
+        // --- Save simulation to backend DB ---
+        async function saveSimulationToDB() {
+            const name = 'Mission - ' + (document.getElementById('mission-select')?.value === 'moon' ? 'Lune' : 'LEO') + ' - ' + new Date().toISOString();
+            const type = (document.getElementById('mission-select')?.value === 'moon') ? 'LAUNCH' : 'ORBITAL';
+            const payload = {
+                name: name,
+                type: type,
+                parameters: {
+                    threeD: appState.simulations.launch.threeD,
+                    currentPhaseIndex: appState.simulations.launch.currentPhaseIndex,
+                    phases: appState.simulations.launch.phases
+                },
+                description: 'Simulation sauvegardée depuis l’interface client.'
+            };
+
+            addTerminalOutput('> Envoi de la simulation vers la base de données...');
+
+            try {
+                const res = await fetch('/backend/api/simulations.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    addTerminalOutput('> Simulation enregistrée (id: ' + (data.data?.id || data.id || 'N/A') + ')');
+                } else {
+                    addTerminalOutput('> Erreur enregistrement: ' + (data.message || JSON.stringify(data)));
+                }
+            } catch (e) {
+                console.error('Erreur saveSimulationToDB:', e);
+                addTerminalOutput('> Erreur: impossible de joindre l\'API de sauvegarde');
+            }
+        }
+    </script>
+</body>
+</html>

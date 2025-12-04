@@ -1,0 +1,80 @@
+{
+  "development": {
+    "database": {
+      "host": "localhost",
+      "port": 3306,
+      "name": "spatial_research_dev",
+      "user": "dev_user",
+      "password": "dev_password_2024"
+    },
+    "api": {
+      "port": 8000,
+      "cors_origins": ["http://localhost:3000", "http://127.0.0.1:3000"],
+      "rate_limit": 1000
+    },
+    "security": {
+      "jwt_secret": "dev_jwt_secret_2024_spatial_research",
+      "encryption_key": "dev_encryption_key_32_chars_long_",
+      "token_expiry": 3600
+    },
+    "features": {
+      "enable_quantum_simulations": true,
+      "enable_3d_visualization": true,
+      "enable_collaboration": true,
+      "enable_data_export": true,
+      "debug_mode": true
+    }
+  },
+  "production": {
+    "database": {
+      "host": "localhost",
+      "port": 3306,
+      "name": "spatial_research_prod",
+      "user": "prod_user",
+      "password": "strong_production_password_2024"
+    },
+    "api": {
+      "port": 8000,
+      "cors_origins": ["https://spatial-research-lab.com"],
+      "rate_limit": 100
+    },
+    "security": {
+      "jwt_secret": "prod_jwt_secret_2024_change_in_production",
+      "encryption_key": "prod_encryption_key_32_chars_long_!!",
+      "token_expiry": 3600
+    },
+    "features": {
+      "enable_quantum_simulations": true,
+      "enable_3d_visualization": true,
+      "enable_collaboration": true,
+      "enable_data_export": true,
+      "debug_mode": false
+    }
+  },
+  "testing": {
+    "database": {
+      "host": "localhost",
+      "port": 3306,
+      "name": "spatial_research_test",
+      "user": "test_user",
+      "password": "test_password_2024"
+    },
+    "api": {
+      "port": 8001,
+      "cors_origins": ["*"],
+      "rate_limit": 10000
+    },
+    "security": {
+      "jwt_secret": "test_jwt_secret_2024",
+      "encryption_key": "test_encryption_key_32_chars_long_",
+      "token_expiry": 3600
+    },
+    "features": {
+      "enable_quantum_simulations": true,
+      "enable_3d_visualization": false,
+      "enable_collaboration": false,
+      "enable_data_export": true,
+      "debug_mode": true
+    }
+  }
+}
